@@ -1,0 +1,7 @@
+name: lumpy
+channels:
+  - bioconda
+  - defaults
+dependencies:
+  - lumpy-sv
+  - samtools

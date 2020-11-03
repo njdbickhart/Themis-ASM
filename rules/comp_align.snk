@@ -1,0 +1,133 @@
+rule plot_frc:
+    input:
+        expand("calls/{asm}/merged_frc.txt_FRC.txt", asm=config["assembly"].keys())
+    output:
+        plot = "final/combined_frc_plot.png"
+    conda:
+        "../envs/base.yaml"
+    params:
+        asms=list(config["assembly"].keys())
+    script:
+        "../scripts/asm_frc_plot.py"
+
+rule ngx_plot:
+    input:
+        asms = expand("fastas/{asm}.fa", asm=config["assembly"].keys()),
+        fais = expand("fastas/{asm}.fa.fai", asm=config["assembly"].keys())
+    output:
+        plot = "final/combined_ngx_plot.png"
+    conda:
+        "../envs/base.yaml"
+    params:
+        asms=list(config["assembly"].keys())
+    script:
+        "../scripts/asm_ngx_plot.py"
+
+
+
+rule minimap_align:
+    input:
+        first = "fastas/{first}.fa",
+        second = "fastas/{second}.fa"
+    output:
+        "mapped/map{first}_{second}.paf"
+    conda:
+        "../envs/dotplotly.yaml"
+    threads:
+        8
+    shell:
+        """
+        minimap2 -x asm10 -t {threads} {input.first} {input.second} > {output}
+        """
+
+rule dotplot:
+    input:
+        "mapped/map{C}.paf"
+    output:
+        png = "final/{C}/plot{C}.png",
+        int = "final/{C}/int{C}.html"
+    conda:
+        "../envs/dotplotly.yaml"
+    params:
+        prefix = lambda wildcards : wildcards.C
+    shell:
+        """
+        Rscript {workflow.basedir}/scripts/pafDotPlotly.R -i {input} -o {params.prefix} -v -l -s
+        mv {params.prefix}.png {output.png}
+        mv {params.prefix}.html {output.int}
+        """
+
+rule variant_sizes:
+    input:
+        "mapped/map{C}.paf"
+    output:
+        "calls/vars{C}.paf"
+    conda:
+        "envs/base.yaml"
+    params:
+        max = 1000000,
+        qdist = 1000000,
+        narrow = 50
+    shell:
+        """
+        python {workflow.basedir}/scripts/betweenAlignmentVariants.py -a {params.max} -q {params.qdist} -n {params.narrow} -f {input} -o {output}
+        """
+
+rule variant_size_histos:
+    input:
+        "calls/vars{C}.paf"
+    output:
+        "final/{C}/vars{C}.log_all_sizes.png",
+        "final/{C}/vars{C}.75-1000.png",
+        "final/{C}/vars{C}.1000-500000.png"
+    params:
+        prefix = lambda wildcards : "vars" + wildcards.C,
+        wc = lambda wildcards : wildcards.C,
+        min = 75,
+        max = 500000,
+        extra = "-p -v"
+    conda:
+        "../envs/dotplotly.yaml"
+    shell:
+        """
+        Rscript {workflow.basedir}/scripts/asm_variant_histos.R -i {input} -o {params.prefix} -q {params.min} -m {params.max} {params.extra}
+        mv {params.prefix}*.png final/{params.wc}/
+        """
+
+rule comparison_webpage:
+    input:
+        fastas = expand("fastas/{asm}.fa", asm=config["assembly"].keys()),
+        dotplots = expand("final/{C}/plot{C}.png", C=pcombis),
+        varplots = expand("final/{C}/vars{C}.log_all_sizes.png", C=pcombis),
+        frcplot = "final/combined_frc_plot.png",
+        ngxplot = "final/combined_ngx_plot.png",
+        ideograms = expand("final/ideogram_errors.{asm}.png", asm = config["assembly"].keys()),
+        spectra = expand("final/{asm}.spectra-asm.st.png", asm = config["assembly"].keys()),
+        summary_table = "final/summary_table.tab",
+        buscoplot = "final/combined_buscos.png",
+    output:
+        "themis_summary_page.html"
+    conda:
+        "../envs/base.yaml"
+    log:
+        "logs/comparison_webpage.log"
+    params:
+        final = "final",
+        output = "summary_page",
+        combos = [f'-c {x} ' for x in pcombis],
+        fastas = lambda wildcards, input: [f'-s {x} ' for x in input.fastas],
+        asms = [f'-a {x} ' for x in list(config["assembly"].keys())]
+    shell:
+        """
+        python {workflow.basedir}/scripts/createWebpage.py -f {params.final} -o {params.output} {params.combos} {params.fastas} {params.asms} 2> {log}
+        """
+
+rule package_for_distrib:
+    input:
+        "themis_summary_page.html"
+    output:
+        "themis_summary.zip"
+    shell:
+        """
+        zip -r {output} {input} final
+        """

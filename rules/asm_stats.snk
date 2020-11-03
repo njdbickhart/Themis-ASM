@@ -1,0 +1,91 @@
+rule download_busco:
+    output:
+        directory("busco_downloads/lineages/{}".format(config["buscoLineage"]))
+    log:
+        "logs/download_busco.log"
+    conda:
+        "../envs/busco.yaml"
+    params:
+        lineage = config["buscoLineage"]
+    shell:
+        """
+        python {workflow.basedir}/scripts/downloadBuscoLineage.py {params.lineage}
+        """
+
+rule run_busco:
+    input:
+        "busco_downloads/lineages/{}".format(config["buscoLineage"]),
+        "fastas/{asm}.fa"
+    output:
+        protected("busco/{asm}/busco_summary.txt")
+    log:
+        "logs/{asm}/run_busco.log"
+    threads: 70
+    conda:
+        "../envs/busco.yaml"
+    params:
+        mode="genome",
+        lineage_path=config["buscoLineage"],
+        asm = lambda wildcards: wildcards.asm,
+        # optional parameters
+        extra=""
+    script:
+        "../scripts/busco_lift.py"
+
+rule plot_busco:
+    input:
+        expand("busco/{asm}/busco_summary.txt", asm=config["assembly"].keys())
+    output:
+        "final/combined_buscos.png"
+    log:
+        "logs/busco_plotting.log"
+    conda:
+        "../envs/base.yaml"
+    params:
+        buscos = lambda wildcards, input: [f'-b {x} ' for x in input],
+        asms= [f'-a {x} ' for x in list(config["assembly"].keys())]
+    shell:
+        "python {workflow.basedir}/scripts/plotBusco.py {params.buscos} {params.asms} -o {output} 2> {log}"
+
+
+rule assembly_stats:
+    input:
+        "fastas/{asm}.fa"
+    output:
+        "mapped/{asm}/stats.tab"
+    conda:
+        "../envs/base.yaml"
+    script:
+        "../scripts/calcFastaSumStats.py"
+
+rule summary_table:
+    input:
+        stats = expand("mapped/{asm}/stats.tab", asm=config["assembly"].keys()),
+        merqv = expand("merqury/{asm}/{asm}.qv", asm=config["assembly"].keys()),
+        complete = expand("merqury/{asm}/{asm}.completeness.stats", asm=config["assembly"].keys()),
+        busco = expand("busco/{asm}/busco_summary.txt", asm=config["assembly"].keys()),
+        snpqv = expand("calls/{asm}/{asm}.qv_value.txt", asm=config["assembly"].keys()),
+        bams=expand("mapped/{asm}/merged.bam", asm=config["assembly"].keys()),
+        features=expand("calls/{asm}/merged_frc.txt_Features.txt", asm=config["assembly"].keys()),
+        lumpy = expand("calls/{asm}/merged_lumpy.vcf", asm=config["assembly"].keys())
+    output:
+        table = "final/summary_table.tab"
+    params:
+        asms=list(config["assembly"].keys())
+    script:
+        "../scripts/summary_table.py"
+
+rule ideogram_plot:
+    input:
+        features="calls/{asm}/merged_frc.txt_Features.txt",
+        bams="mapped/{asm}/merged.bam"
+    output:
+        ideogram="final/ideogram_errors.{asm}.png",
+        bed="final/ideogram_upperq_error_windows.{asm}.bed"
+    params:
+        chrthresh = 30
+    conda:
+        "../envs/base.yaml"
+    shell:
+        'python {workflow.basedir}/scripts/ideogram_feature_plot.py -f {input.features}'
+        ' -b {input.bams} -o {output.ideogram} -e {output.bed} -t {params.chrthresh}'

@@ -1,0 +1,13 @@
+{
+  "assembly" : {
+    "asm1" : "fasta",
+    "asm2" : "fasta"
+  },
+  "buscoLineage" : "eudicots_odb10",
+  "samples" : {
+    "YMPrep3" : [
+      "/path/to/read/one/read_R1.fastq",
+      "/path/to/read/two/read_R2.fastq"
+    ]
+  }
+}

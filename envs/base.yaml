@@ -1,0 +1,15 @@
+channels:
+    - anaconda
+    - bioconda
+dependencies:
+    - python=3.7
+    - numpy
+    - pandas
+    - pysam
+    - jinja2
+    - markdown
+    - smartypants
+    - matplotlib
+    - scipy
+    - samtools
+    - bwa

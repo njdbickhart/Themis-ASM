@@ -1,0 +1,130 @@
+def getFlatFastqList(wildcards, config):
+    data = list()
+    for i in range(2):
+        data.append(config["samples"][wildcards.sample][i])
+    return data
+
+rule meryl_hapmer:
+    input:
+        lambda wildcards : getFlatFastqList(wildcards, config)
+    output:
+        directory("mapped/{sample}_1.meryl"),
+        directory("mapped/{sample}_2.meryl")
+    threads: 24
+    params:
+        k = 21,
+        extra = "threads=24 memory=48"
+    shell:
+        """
+        module load merqury/1.0
+        meryl k={params.k} count output {output[0]} {params.extra} {input[0]}
+        meryl k={params.k} count output {output[1]} {params.extra} {input[1]}
+        """
+
+rule meryl_merge:
+    input:
+        expand("mapped/{sample}_{lane}.meryl", sample=config["samples"], lane=["1", "2"])
+    output:
+        directory("mapped/meryl_db.meryl"),
+    threads: 10
+    params:
+        extra = "cpus=10 memory=48g"
+    shell:
+        """
+        module load merqury/1.0
+        meryl union-sum output {output} {input}
+        """
+
+rule meryl_merge_sample:
+    input:
+        expand("mapped/{{sample}}_{lane}.meryl", lane=["1", "2"])
+    output:
+        directory("mapped/per{sample}_db.meryl")
+    threads: 10
+    params:
+        extra = "cpus=10 memory=48g"
+    shell:
+        """
+        module load merqury/1.0
+        meryl union-sum output {output} {input}
+        """
+
+rule run_sample_merqury:
+    input:
+        mdb = "mapped/per{sample}_db.meryl",
+        fasta = lambda wildcards: config["assembly"][wildcards.asm]
+    output:
+        dist_only = "merqury/{asm}/per{sample}.dist_only.hist",
+        qv = "merqury/{asm}/per{sample}.qv",
+        spectraasm = "merqury/{asm}/per{sample}.spectra-asm.hist",
+        f1 = "merqury/{asm}/per{sample}.spectra-asm.fl.pdf",
+        ln = "merqury/{asm}/per{sample}.spectra-asm.ln.pdf",
+        st = "merqury/{asm}/per{sample}.spectra-asm.st.pdf",
+        complete = "merqury/{asm}/per{sample}.completeness.stats"
+    params:
+        outbase = "per{sample}",
+        asmbase = "{asm}",
+        pdfbase = "per{sample}.spectra-asm"
+    threads: 20
+    shell:
+        """
+        module load merqury/1.0
+        bash {workflow.basedir}/scripts/spectra-cn.revised.sh {input.mdb} {input.fasta} {params.asmbase} {params.outbase}
+        mv {params.outbase}.* ./merqury/{params.asmbase}/
+        /software/7/apps/merqury/1.0/plot/plot_spectra_cn.R -f {output.spectraasm} -o {params.pdfbase} -z {output.dist_only} --pdf
+        mv {params.pdfbase}.*.pdf ./merqury/{params.asmbase}/
+        """
+
+rule run_merqury:
+    input:
+        mdb = "mapped/meryl_db.meryl",
+        fasta = "fastas/{asm}.fa"
+    output:
+        dist_only = "merqury/{asm}/{asm}.dist_only.hist",
+        qv = "merqury/{asm}/{asm}.qv",
+        spectraasm = "merqury/{asm}/{asm}.spectra-asm.hist",
+        complete = "merqury/{asm}/{asm}.completeness.stats",
+        db = directory("merqury/{asm}/{asm}.meryl")
+    log:
+        "logs/{asm}/run_merqury.log"
+    params:
+        outbase = lambda wildcards: wildcards.asm
+    threads: 2
+    conda:
+        "../envs/dotplotly.yaml"
+    shell:
+        """
+        module load merqury/1.0
+        bash {workflow.basedir}/scripts/merqury_spectra_venn.sh {input.mdb} {input.fasta} {params.outbase} {params.outbase} 2> {log}
+        mv {params.outbase}.*.pdf ./merqury/{params.outbase}/
+        mv {params.outbase}.* ./merqury/{params.outbase}/
+        """
+
+rule plot_merqury:
+    input:
+        dist_only = "merqury/{asm}/{asm}.dist_only.hist",
+        spectraasm = "merqury/{asm}/{asm}.spectra-asm.hist"
+    output:
+        f1 = "merqury/{asm}/{asm}.spectra-asm.fl.png",
+        ln = "merqury/{asm}/{asm}.spectra-asm.ln.png",
+        st = "merqury/{asm}/{asm}.spectra-asm.st.png"
+    params:
+        outbase = lambda wildcards: wildcards.asm,
+        pngbase = lambda wildcards: wildcards.asm + ".spectra-asm"
+    conda:
+        "../envs/dotplotly.yaml"
+    shell:
+        """
+        Rscript /software/7/apps/merqury/1.0/plot/plot_spectra_cn.R -f {input.spectraasm} -o {params.pngbase} -z {input.dist_only}
+        mv {params.pngbase}*.png ./merqury/{params.outbase}/
+        """
+
+rule move_kplots:
+    input:
+        st = "merqury/{asm}/{asm}.spectra-asm.st.png"
+    output:
+        final = "final/{asm}.spectra-asm.st.png"
+    shell:
+        """
+        cp {input.st} {output.final}
+        """

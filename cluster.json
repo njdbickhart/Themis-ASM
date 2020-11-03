@@ -1,0 +1,200 @@
+{
+  "__default__" :
+  {
+    "mem" : "5000",
+    "ntasks-per-node" : "1",
+    "nodes" : "1",
+    "partition" : "priority",
+    "qos" : "msn",
+    "stdout" : "logs/{rule}.{wildcards.sample}.stdout",
+    "jobname" : "{rule} [{wildcards.sample}]"
+  },
+
+  "bwa_index":
+  {
+    "mem" : "15000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "align_reads":
+  {
+    "mem" : "15000",
+    "ntasks-per-node" : "{threads}"
+  },
+
+  "merge_bams":
+  {
+    "mem" : "30000",
+    "ntasks-per-node" : "{threads}",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "freebayes":
+  {
+    "mem" : "20000",
+    "ntasks-per-node" : "{threads}",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "frc_align":
+  {
+    "mem" : "15000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "lumpy":
+  {
+    "mem" : "35000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "samtools_depth":
+  {
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "meryl_hapmer":
+  {
+    "mem" : "52000",
+    "ntasks-per-node" : "{threads}"
+  },
+
+  "meryl_merge":
+  {
+    "mem" : "52000",
+    "ntasks-per-node" : "{threads}",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "run_sample_merqury":
+  {
+    "mem" : "25000",
+    "ntasks-per-node" : "{threads}",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "run_merqury":
+  {
+    "mem" : "25000",
+    "ntasks-per-node" : "{threads}",
+    "stdout" : "logs/{wildcards.asm}/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "qv_estimate" :
+  {
+    "mem" : "15000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "download_busco":
+  {
+    "mem" : "15000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "summary_table" :
+  {
+    "mem" : "10000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "run_busco" :
+  {
+    "mem" : "380000",
+    "ntasks-per-node" : "{threads}",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "ideogram_plot" :
+  {
+    "mem" : "25000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "assembly_stats" :
+  {
+    "mem" : "25000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+
+  "plot_frc" :
+  {
+    "mem" : "25000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+
+  "ngx_plot" :
+  {
+    "mem" : "25000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "minimap_align" :
+  {
+    "mem" : "35000",
+    "ntasks-per-node" : "{threads}",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "dotplot" :
+  {
+    "mem" : "25000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "variant_sizes" :
+  {
+    "mem" : "10000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "variant_size_histos" :
+  {
+    "mem" : "10000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "plot_busco" :
+  {
+    "mem" : "10000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+
+  "plot_merqury" :
+  {
+    "mem" : "10000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  },
+  
+  "comparison_webpage" :
+  {
+    "mem" : "10000",
+    "stdout" : "logs/{rule}.stdout",
+    "jobname" : "{rule}"
+  }
+}
