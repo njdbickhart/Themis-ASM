@@ -16,7 +16,6 @@ rule meryl_hapmer:
         extra = "threads=24 memory=48"
     shell:
         """
-        module load merqury/1.0
         meryl k={params.k} count output {output[0]} {params.extra} {input[0]}
         meryl k={params.k} count output {output[1]} {params.extra} {input[1]}
         """
@@ -31,7 +30,6 @@ rule meryl_merge:
         extra = "cpus=10 memory=48g"
     shell:
         """
-        module load merqury/1.0
         meryl union-sum output {output} {input}
         """
 
@@ -45,7 +43,6 @@ rule meryl_merge_sample:
         extra = "cpus=10 memory=48g"
     shell:
         """
-        module load merqury/1.0
         meryl union-sum output {output} {input}
         """
 
@@ -68,7 +65,6 @@ rule run_sample_merqury:
     threads: 20
     shell:
         """
-        module load merqury/1.0
         bash {workflow.basedir}/scripts/spectra-cn.revised.sh {input.mdb} {input.fasta} {params.asmbase} {params.outbase}
         mv {params.outbase}.* ./merqury/{params.asmbase}/
         /software/7/apps/merqury/1.0/plot/plot_spectra_cn.R -f {output.spectraasm} -o {params.pdfbase} -z {output.dist_only} --pdf
@@ -94,7 +90,6 @@ rule run_merqury:
         "../envs/dotplotly.yaml"
     shell:
         """
-        module load merqury/1.0
         bash {workflow.basedir}/scripts/merqury_spectra_venn.sh {input.mdb} {input.fasta} {params.outbase} {params.outbase} 2> {log}
         mv {params.outbase}.*.pdf ./merqury/{params.outbase}/
         mv {params.outbase}.* ./merqury/{params.outbase}/
