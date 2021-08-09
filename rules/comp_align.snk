@@ -135,7 +135,7 @@ rule variant_size_pdfs:
     shell:
         """
         Rscript {workflow.basedir}/scripts/asm_variant_histos.R -i {input} -o {params.prefix} -q {params.min} -m {params.max} {params.extra}
-        mv {params.prefix}*.png final/{params.wc}/
+        mv {params.prefix}*.pdf final/{params.wc}/
         """
 
 rule pdfs_finished:
