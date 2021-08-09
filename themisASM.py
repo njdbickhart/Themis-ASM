@@ -74,21 +74,21 @@ def main(args, parser):
 
     # Now attempt to run it!
     try:
-        LOG.INFO("Trying to run the snakemake job in this scrpt... wish me luck!")
+        LOG.info("Trying to run the snakemake job in this scrpt... wish me luck!")
         sp.run(cmd, shell=True, check=True)
-    except CalledProcessError as inst:
+    except Exception as inst:
         LOG.info("We ran into an error! Please try to resume using this script or run the snake command manually")
         LOG.error(inst.args)
         sys.exit()
 
-    LOG.INFO("I think we're finished! Check that zip file!")
+    LOG.info("I think we're finished! Check that zip file!")
 
 def createSNKCmd(args):
     cmd = f'snakemake -s {SCRIPT_DIR}/themisSnakefile --jobs {args.jobs} -p --use-conda'
 
     if args.cluster_string != None:
         LOG.info("Detected cluster submission information! Running cluster jobs")
-        cmd += f' --cluster-config {SCRIPT_DIR}/cluster.json --cluster {args.cluster_string}'
+        cmd += f' --cluster-config {SCRIPT_DIR}/cluster.json --cluster "{args.cluster_string}"'
 
     LOG.info("Created snakemake submission string\nIf you want to run this on your own, please use the following command:\n" + cmd)
     return cmd
@@ -112,7 +112,7 @@ def createConfig(args):
         config += f'    "{aname}" : "{afile}",\n'
     config += "  },\n  \"samples\" : {\n"
 
-    for sname, fqstr in zip(args.name, args.fastq):
+    for sname, fqstr in zip(args.sample, args.fastq):
         fqseg = fqstr.split(',')
         if len(fqseg) != 2:
             raise RuntimeError(f'It looks like you entered an unpaired fastq set! Please add both reads as a comma delmited entry!\n')

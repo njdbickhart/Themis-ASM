@@ -19,7 +19,7 @@
 
   "align_reads":
   {
-    "mem" : "15000",
+    "mem" : "17000",
     "ntasks-per-node" : "{threads}"
   },
 
@@ -33,7 +33,7 @@
 
   "freebayes":
   {
-    "mem" : "20000",
+    "mem" : "25000",
     "ntasks-per-node" : "{threads}",
     "stdout" : "logs/{rule}.stdout",
     "jobname" : "{rule}"
@@ -48,7 +48,7 @@
 
   "lumpy":
   {
-    "mem" : "35000",
+    "mem" : "65000",
     "stdout" : "logs/{rule}.stdout",
     "jobname" : "{rule}"
   },
@@ -75,7 +75,7 @@
 
   "run_sample_merqury":
   {
-    "mem" : "25000",
+    "mem" : "55000",
     "ntasks-per-node" : "{threads}",
     "stdout" : "logs/{rule}.stdout",
     "jobname" : "{rule}"
@@ -83,7 +83,7 @@
 
   "run_merqury":
   {
-    "mem" : "25000",
+    "mem" : "55000",
     "ntasks-per-node" : "{threads}",
     "stdout" : "logs/{wildcards.asm}/{rule}.stdout",
     "jobname" : "{rule}"
@@ -150,7 +150,7 @@
 
   "minimap_align" :
   {
-    "mem" : "35000",
+    "mem" : "100000",
     "ntasks-per-node" : "{threads}",
     "stdout" : "logs/{rule}.stdout",
     "jobname" : "{rule}"

@@ -76,7 +76,7 @@ for (i in seq(1,length(var_size_cutoffs)-1)) {
             summary(filtered_bed)
         }
 
-        if (nrow(filtered_bed)>0) {
+        if (nrow(filtered_bed)>-1) {
             if (opt$to_png) {
                 if (opt$verbose){ print("Printing png...")}
                 png(paste(opt$output_prefix,".", format(min_var, scientific=FALSE), "-",format(max_var, scientific=FALSE), ".png", sep=""),1000,1000,res=200)

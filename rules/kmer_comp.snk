@@ -90,6 +90,7 @@ rule run_merqury:
         "../envs/dotplotly.yaml"
     shell:
         """
+        module load merqury/1.1
         bash {workflow.basedir}/scripts/merqury_spectra_venn.sh {input.mdb} {input.fasta} {params.outbase} {params.outbase} 2> {log}
         mv {params.outbase}.*.pdf ./merqury/{params.outbase}/
         mv {params.outbase}.* ./merqury/{params.outbase}/

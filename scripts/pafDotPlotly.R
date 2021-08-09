@@ -75,7 +75,7 @@ if(opt$v){
 opt$output_filename = unlist(strsplit(opt$output_filename, "/"))[length(unlist(strsplit(opt$output_filename, "/")))]
 
 # read in alignments
-alignments = read.table(opt$input_filename, stringsAsFactors = F, fill = T)
+alignments = read.table(opt$input_filename, stringsAsFactors = F, fill = T, row.names=NULL)
 
 # set column names
 # PAF IS ZERO-BASED - CHECK HOW CODE WORKS

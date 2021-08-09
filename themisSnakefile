@@ -17,11 +17,6 @@ os.makedirs("fastas", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 os.makedirs("mapped", exist_ok=True)
 
-include: "rules/sequence_stats.snk"
-include: "rules/asm_stats.snk"
-include: "rules/kmer_comp.snk"
-include: "rules/comp_align.snk"
-
 finalSummary = ["final/summary_table.tab"]
 pcombis = []
 if len(config["assembly"].keys()) > 1:
@@ -31,6 +26,12 @@ if len(config["assembly"].keys()) > 1:
     finalSummary.extend(expand("final/{C}/plot{C}.png", C=pcombis))
     finalSummary.extend(expand("final/{C}/vars{C}.log_all_sizes.png", C=pcombis))
     finalSummary.append("themis_summary.zip")
+
+include: "rules/sequence_stats.snk"
+include: "rules/asm_stats.snk"
+include: "rules/kmer_comp.snk"
+include: "rules/comp_align.snk"
+
 
 rule all:
     input:

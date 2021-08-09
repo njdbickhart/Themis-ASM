@@ -8,7 +8,20 @@ function usage {
   echo -e "\t<out-prefix>: output prefix. Required."
 }
 
-source $MERQURY/util/util.sh
+function link()
+{
+        db_name=`basename $1`
+        if ! [[ -e $db_name ]]; then
+                ln -s $1
+        fi
+        echo $db_name
+}
+
+function check_module()
+{
+        module -v 1> /dev/null 2> /dev/null
+        echo $?
+}
 
 mkdir -p merqury/$asm
 

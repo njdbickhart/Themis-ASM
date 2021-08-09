@@ -63,7 +63,7 @@ rule variant_sizes:
     output:
         "calls/vars{C}.paf"
     conda:
-        "envs/base.yaml"
+        "../envs/base.yaml"
     params:
         max = 1000000,
         qdist = 1000000,
@@ -113,7 +113,7 @@ rule comparison_webpage:
         "logs/comparison_webpage.log"
     params:
         final = "final",
-        output = "summary_page",
+        output = "themis_summary_page",
         combos = [f'-c {x} ' for x in pcombis],
         fastas = lambda wildcards, input: [f'-s {x} ' for x in input.fastas],
         asms = [f'-a {x} ' for x in list(config["assembly"].keys())]
