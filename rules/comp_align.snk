@@ -23,7 +23,30 @@ rule ngx_plot:
     script:
         "../scripts/asm_ngx_plot.py"
 
+rule frc_pdf:
+    input:
+        expand("calls/{asm}/merged_frc.txt_FRC.txt", asm=config["assembly"].keys())
+    output:
+        plot = "final/combined_frc_plot.pdf"
+    conda:
+        "../envs/base.yaml"
+    params:
+        asms=list(config["assembly"].keys())
+    script:
+        "../scripts/asm_frc_plot.py"
 
+rule ngx_pdf:
+    input:
+        asms = expand("fastas/{asm}.fa", asm=config["assembly"].keys()),
+        fais = expand("fastas/{asm}.fa.fai", asm=config["assembly"].keys())
+    output:
+        plot = "final/combined_ngx_plot.pdf"
+    conda:
+        "../envs/base.yaml"
+    params:
+        asms=list(config["assembly"].keys())
+    script:
+        "../scripts/asm_ngx_plot.py"
 
 rule minimap_align:
     input:
@@ -94,6 +117,36 @@ rule variant_size_histos:
         mv {params.prefix}*.png final/{params.wc}/
         """
 
+rule variant_size_pdfs:
+    input:
+        "calls/vars{C}.paf"
+    output:
+        "final/{C}/vars{C}.log_all_sizes.pdf",
+        "final/{C}/vars{C}.75-1000.pdf",
+        "final/{C}/vars{C}.1000-500000.pdf"
+    params:
+        prefix = lambda wildcards : "vars" + wildcards.C,
+        wc = lambda wildcards : wildcards.C,
+        min = 75,
+        max = 500000,
+        extra = "-v"
+    conda:
+        "../envs/dotplotly.yaml"
+    shell:
+        """
+        Rscript {workflow.basedir}/scripts/asm_variant_histos.R -i {input} -o {params.prefix} -q {params.min} -m {params.max} {params.extra}
+        mv {params.prefix}*.png final/{params.wc}/
+        """
+
+rule pdfs_finished:
+    input:
+        varplots = expand("final/{C}/vars{C}.log_all_sizes.pdf", C=pcombis),
+        frcplot = "final/combined_frc_plot.pdf",
+        ngxplot = "final/combined_ngx_plot.pdf",
+        buscoplot = "final/combined_buscos.pdf"
+    output:
+        temp(touch("pdfsFinished"))
+
 rule comparison_webpage:
     input:
         fastas = expand("fastas/{asm}.fa", asm=config["assembly"].keys()),
@@ -124,10 +177,11 @@ rule comparison_webpage:
 
 rule package_for_distrib:
     input:
-        "themis_summary_page.html"
+        webpage = "themis_summary_page.html",
+        pdfs = "pdfsFinished"
     output:
         "themis_summary.zip"
     shell:
         """
-        zip -r {output} {input} final
+        zip -r {output} {input.webpage} final
         """

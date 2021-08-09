@@ -49,6 +49,20 @@ rule plot_busco:
     shell:
         "python {workflow.basedir}/scripts/plotBusco.py {params.buscos} {params.asms} -o {output} 2> {log}"
 
+rule busco_pdf:
+    input:
+        expand("busco/{asm}/busco_summary.txt", asm=config["assembly"].keys())
+    output:
+        "final/combined_buscos.pdf"
+    log:
+        "logs/busco_pdf_plotting.log"
+    conda:
+        "../envs/base.yaml"
+    params:
+        buscos = lambda wildcards, input: [f'-b {x} ' for x in input],
+        asms= [f'-a {x} ' for x in list(config["assembly"].keys())]
+    shell:
+        "python {workflow.basedir}/scripts/plotBusco.py {params.buscos} {params.asms} -o {output} 2> {log}"
 
 rule assembly_stats:
     input:
