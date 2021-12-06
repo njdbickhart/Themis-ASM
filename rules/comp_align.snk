@@ -1,3 +1,15 @@
+# TODO: Revise logic on single vs multiple assembly comparisons
+if len(config["assembly"].keys()) == 1:
+    rule fakedone:
+        output:
+            temp(touch("CompDone"))
+else:
+    rule actualdone:
+        input:
+            varplots = expand("final/{C}/vars{C}.log_all_sizes.pdf", C=pcombis)
+        output:
+            temp(touch("CompDone"))
+
 rule plot_frc:
     input:
         expand("calls/{asm}/merged_frc.txt_FRC.txt", asm=config["assembly"].keys())
@@ -147,8 +159,11 @@ rule pdfs_finished:
     output:
         temp(touch("pdfsFinished"))
 
+
+# TODO: Revise website script to accomodate only one assembly for comparison
 rule comparison_webpage:
     input:
+        doneFile = "CompDone",
         fastas = expand("fastas/{asm}.fa", asm=config["assembly"].keys()),
         dotplots = expand("final/{C}/plot{C}.png", C=pcombis),
         varplots = expand("final/{C}/vars{C}.log_all_sizes.png", C=pcombis),

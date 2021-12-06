@@ -209,7 +209,7 @@ def main(args, parser):
 
     # Create the main index html
     mdlines = indexMd(args.fasta, args.assembly, args.combos, args.final)
-    createHtml(''.join(mdlines), "Assembly Quality Control", args.output + ".html")
+    createHtml(''.join(mdlines), "Themis-ASM Summary", args.output + ".html")
 
     # Now create sub htmls for comparison plots
     for c in args.combos:

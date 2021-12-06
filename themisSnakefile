@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess as sp
 import itertools
 from subprocess import PIPE, STDOUT
@@ -25,7 +26,14 @@ if len(config["assembly"].keys()) > 1:
     pcombis = [c[0] + "_" + c[1] for c in list(itertools.combinations(config["assembly"].keys(), 2))]
     finalSummary.extend(expand("final/{C}/plot{C}.png", C=pcombis))
     finalSummary.extend(expand("final/{C}/vars{C}.log_all_sizes.png", C=pcombis))
-    finalSummary.append("themis_summary.zip")
+elif len(config["assembly"].keys()) == 1:
+    print("Not implemented yet")
+    # TODO: add specific files for single assembly comparisons
+else:
+    # TODO: Generate a log file with error message
+    sys.exit(-1)
+
+finalSummary.append("themis_summary.zip")
 
 include: "rules/sequence_stats.snk"
 include: "rules/asm_stats.snk"
