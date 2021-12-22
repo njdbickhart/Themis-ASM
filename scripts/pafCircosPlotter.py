@@ -4,8 +4,9 @@ import os
 import errno
 import sys
 import shutil
-import subprocess
+import subprocess as sp
 import argparse
+from collections import defaultdict, deque
 
 
 def arg_parse():
@@ -33,24 +34,207 @@ def arg_parse():
                         required=True, type=str,
                         )
     parser.add_argument('-m', '--minimum',
-                        help="Optional integer parameter to filter minimum alignment lengths [0.01 of total assembly size]",
+                        help="Optional integer parameter to filter minimum alignment lengths [0.05 of total assembly size]",
                         default=-1, type=int,
+                        )
+    parser.add_argument('-c', '--maxchr',
+                        help="Maximum number of chromosomes to plot per assembly.",
+                        required=True, type=int,
                         )
 
     return parser.parse_args(), parser
 
-class KaryotypeFile:
+def main(args, parser):
+    print("Not done!")
 
-    def __init__(self, algnDict, targetList, corrKey, ctgLenDict, outDir):
+    # Create main configuration workhorse and generate correspondance tags
+    cConf = CircosConf(args.output)
+    cConf.createCorrespondance(args.reference, args.query, args.minimum, args.bedfile)
+
+    if args.bedfile != "None":
+        cConf.readTargets(args.bedfile)
+
+    # Now create Karyotype file
+    kFile = KaryotypeFile(cConf.targetList, cConf.corrKey, cConf.refLenDict, args.output)
+    kFile.filterTargetList(args.maxchr)
+
+    kFile.readPAF(args.paf, args.minimum)
+    kFile.writeKaryotype(args.minimum)
+
+    # Now create the Link file
+    lFile = LinkFile(kFile.algnDict, cConf.targetList, cConf.corrKey, args.output)
+    lFile.writeLinks(args.minimum)
+
+    # Finally, create the remaining configuration files
+    cConf.createTicksFile()
+    cConf.createIdeogramFile()
+    cConf.createConfFile(kFile.getIdeogramList(), kFile.generateRuleText())
+
+    # Assuming everything worked, try to run circos
+    cConf.run('circos')
+
+
+class CircosConf:
+
+    def __init__(self, outDir):
+        self.outDir = outDir
+        self.colors = deque([f'chr{x}' for x in range(1, 25)])
+
+        self.targetList = []
+        self.corrKey = defaultdict(dict)
+        self.refLenDict = {}
+        self.qLenDict = {}
+
+    def replacePattern(self, input_text, patterns, replacements):
+        for p, r in zip(patterns, replacements):
+            input_text.replace(p, r)
+
+        return input_text
+
+    def createConfFile(self, ideogramtext, rulestext):
+        with open(os.path.join(self.outDir, "circos.conf"), 'w') as output:
+            output.write(self.replacePattern(CIRCOS,
+            ["<CHROMOSOMES_WILL_GO_HERE>", "<RULES_GO_HERE>"],
+            [ideogramtext, rulestext]))
+
+    def createTicksFile(self):
+        with open(os.path.join(self.outDir, "ticks.conf"), 'w') as output:
+            output.write(TICKS)
+
+    def createIdeogramFile(self):
+        with open(os.path.join(self.outDir, "ideogram.conf"), 'w') as output:
+            output.write(IDEOGRAM)
+
+    def readTargets(self, bedfile):
+        if bedfile != "None":
+            with open(bedfile, 'r') as input:
+                for l in input:
+                    s = l.rstrip().split()
+                    if len(s) == 0 or s[0] == "" :
+                        continue
+                    ctg = s[0]
+                    start = int(s[1])
+                    end = int(s[2])
+                    color = self.colors
+                    self.colors.rotate(1)
+                    try :
+                        color = s[3]
+                    except :
+                        pass
+                    self.targetList.append(Target(ctg, self.corrKey["QUERY"][ctg], start, end, color, self.qLenDict[s[0]]))
+
+
+    def createCorrespondance(self, ref, query, min_align_length, bedfile):
+        n = 0
+        for f, t in zip([ref, query], ["REF", "QUERY"]):
+            if not os.path.exists(f + '.fai'):
+                print(f'Building fasta index for {t} file: {f}')
+                sp.Popen(f'samtools faidx {f}', shell=True)
+
+            with open(f + '.fai', 'r') as input:
+                for l in input:
+                    s = l.rstrip().split()
+                    if int(s[1]) < min_align_length:
+                        continue
+                    self.corrKey[t][s[0]] = f'av{n}'
+                    if t == "REF":
+                        self.refLenDict[s[0]] = int(s[1])
+                    else:
+                        self.qLenDict[s[0]] = int(s[1])
+                    if bedfile == "None":
+                        color = self.colors
+                        self.colors.rotate(1)
+                        self.targetList.append(Target(s[0], self.corrKey[t][s[0]], 1, int(s[1]), color, int(s[1])))
+                    n += 1
+
+    def run(self, cmd) :
+        cwd = os.getcwd()
+        os.chdir(os.path.join(self.outdir))
+        print("Running circos in {}".format(os.getcwd()))
+        proc = sp.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc.communicate()
+        print("Done!")
+        os.chdir(cwd)
+
+class LinkFile:
+
+    def __init__(self, algnDict, targetList, corrKey, outDir):
         """ """
         self.algnDict = algnDict
         self.targetList = targetList
         self.corrKey = corrKey
-        self.ctgLenDict = ctgLenDict
         self.outDir = outDir
 
+        self.pairs = []
+
+    def writeLinks(self, min_align_length):
+        with open(os.path.join(self.outDir, "links.txt"), 'w') as output:
+            for p, target in enumerate(self.targetList) :
+                if target.name not in self.algnDict.keys() :
+                    continue
+                for n, aln in enumerate(self.algnDict[target.name]) :
+                    if aln.length < min_align_length :
+                        continue
+                    link1 = "link{} {} {} {}".format(str(p)+"_"+str(n), target.tag, aln.T_start, aln.T_end)
+                    output.write(link1+"\n")
+                    link2 = "link{} {} {} {}".format(str(p)+"_"+str(n), self.corrKey["QUERY"][aln.query], aln.Q_start, aln.Q_end)
+                    output.write(link2+"\n")
+                    self.pairs.append(Coords(target.name, aln.T_start, aln.T_end, aln.query, aln.Q_start, aln.Q_end))
+
+
+class KaryotypeFile:
+
+    def __init__(self, targetList, corrKey, refLenDict, outDir):
+        """ """
+        self.targetList = targetList
+        self.corrKey = corrKey
+        self.refLenDict = refLenDict
+        self.outDir = outDir
+
+        self.targets_to_plot = set()
+        self.algnDict = {}
         self.karyotypes = []
         self.ideogramList = []
+
+    def getTargetList(self):
+        return self.targetList
+
+    def getIdeogramList(self):
+        return ';'.join(self.ideogramList)
+
+    def filterTargetList(self, maxChr):
+        sorted_chromosomes = [x for x, j in sorted(self.refLenDict.items(), key=lambda item : item[1], reverse=True)]
+        self.targets_to_plot = set(sorted_chromosomes[:maxChr])
+
+    def generateRuleText(self):
+        text = ''
+        for t in self.targetList:
+            if t.name in self.targets_to_plot:
+                text += f'<rule>\ncondition = to({t.tag})\ncolor={t.color}\nstroke_color={t.color}\n</rule>\n\n'
+
+        return text
+
+    def readPAF(self, paf, min_align_length):
+        with open(paf, 'r') as input:
+            for l in input:
+                s = l.rstrip().split()
+                if s[5] not in self.targets_to_plot:
+                    continue
+                t_len = int(s[6])
+                query = s[0]
+                q_len = int(s[1])
+                q_start = int(s[2])
+                q_end = int(s[3])
+                t_start = int(s[7])
+                t_end = int(s[8])
+                length = int(s[10])
+
+                if length <= min_align_length:
+                    continue
+                if target not in self.algnDict.keys() :
+                    self.algnDict[target] = [Alignment(query, q_start, q_end, t_start, t_end, length)]
+                else :
+                    self.algnDict[target].append(Alignment(query, q_start, q_end, t_start, t_end, length))
 
     def writeKaryotype(self, min_align_length):
         skips = 0
@@ -233,3 +417,7 @@ ribbon	      = yes
 
 <<include etc/housekeeping.conf>>
 """
+
+if __name__ == "__main__":
+    args, parser = parse_user_input()
+    main(args, parser)
