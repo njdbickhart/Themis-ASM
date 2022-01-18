@@ -6,10 +6,11 @@ import sys
 import shutil
 import subprocess as sp
 import argparse
+import logging
 from collections import defaultdict, deque
 
 
-def arg_parse():
+def parse_user_input():
     parser = argparse.ArgumentParser(
             description = "A tool to convert a PAF file of assembly alignments into a Circos Jupiter-style plot"
             )
@@ -41,11 +42,14 @@ def arg_parse():
                         help="Maximum number of chromosomes to plot per assembly.",
                         required=True, type=int,
                         )
+    parser.add_argument('-d', '--debug',
+                        help="Run in Debug mode",
+                        default=False, action='store_true',
+                        )
 
     return parser.parse_args(), parser
 
 def main(args, parser):
-    print("Not done!")
 
     # Create main configuration workhorse and generate correspondance tags
     cConf = CircosConf(args.output)
@@ -54,8 +58,18 @@ def main(args, parser):
     if args.bedfile != "None":
         cConf.readTargets(args.bedfile)
 
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+        logging.debug('Entering debug mode')
+    else:
+        logging.basicConfig(level=logging.INFO)
+        
+
+    # Create output directory
+    os.makedirs(args.output, exist_ok=True)
+
     # Now create Karyotype file
-    kFile = KaryotypeFile(cConf.targetList, cConf.corrKey, cConf.refLenDict, args.output)
+    kFile = KaryotypeFile(cConf.targetList, cConf.queryList, cConf.corrKey, cConf.refLenDict, cConf.qLenDict, args.output)
     kFile.filterTargetList(args.maxchr)
 
     kFile.readPAF(args.paf, args.minimum)
@@ -78,16 +92,18 @@ class CircosConf:
 
     def __init__(self, outDir):
         self.outDir = outDir
-        self.colors = deque([f'chr{x}' for x in range(1, 25)])
+        self.colors = deque([f'chr{x}' for x in [1,17,9,22,11,7,16,8,15,2,14,10,5,13,4,12,3,18,21,19,6,20,21,23]])
 
         self.targetList = []
+        self.queryList = []
         self.corrKey = defaultdict(dict)
         self.refLenDict = {}
         self.qLenDict = {}
 
     def replacePattern(self, input_text, patterns, replacements):
         for p, r in zip(patterns, replacements):
-            input_text.replace(p, r)
+            input_text = input_text.replace(p, r)
+            logging.debug(f'REPLACEMENT-----{r}\n{input_text}\n')
 
         return input_text
 
@@ -125,35 +141,36 @@ class CircosConf:
 
 
     def createCorrespondance(self, ref, query, min_align_length, bedfile):
-        n = 0
+        n = 1
         for f, t in zip([ref, query], ["REF", "QUERY"]):
             if not os.path.exists(f + '.fai'):
-                print(f'Building fasta index for {t} file: {f}')
+                logging.info(f'Building fasta index for {t} file: {f}')
                 sp.Popen(f'samtools faidx {f}', shell=True)
-
             with open(f + '.fai', 'r') as input:
                 for l in input:
                     s = l.rstrip().split()
-                    if int(s[1]) < min_align_length:
-                        continue
                     self.corrKey[t][s[0]] = f'av{n}'
                     if t == "REF":
                         self.refLenDict[s[0]] = int(s[1])
                     else:
                         self.qLenDict[s[0]] = int(s[1])
                     if bedfile == "None":
-                        color = self.colors
-                        self.colors.rotate(1)
-                        self.targetList.append(Target(s[0], self.corrKey[t][s[0]], 1, int(s[1]), color, int(s[1])))
+                        if t == "REF":
+                            color = self.colors[0]
+                            self.colors.rotate(1)
+                            self.targetList.append(Target(s[0], self.corrKey[t][s[0]], 1, int(s[1]), color, int(s[1])))
+                        else:
+                            color = 'chr10'
+                            self.queryList.append(Target(s[0], self.corrKey[t][s[0]], 1, int(s[1]), color, int(s[1])))
                     n += 1
 
     def run(self, cmd) :
         cwd = os.getcwd()
-        os.chdir(os.path.join(self.outdir))
-        print("Running circos in {}".format(os.getcwd()))
-        proc = sp.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        os.chdir(os.path.join(self.outDir))
+        logging.info("Running circos in {}".format(os.getcwd()))
+        proc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT)
         proc.communicate()
-        print("Done!")
+        logging.info("Done!")
         os.chdir(cwd)
 
 class LinkFile:
@@ -167,13 +184,31 @@ class LinkFile:
 
         self.pairs = []
 
+    def _calcMinLen(self):
+        llist = []
+        for t in self.targetList:
+            if t.name not in self.algnDict.keys():
+                continue
+            llist.extend([x.length for x in self.algnDict[t.name]])
+        llist.sort(reverse=True)
+        logging.debug(len(llist))
+        cutoff = int(len(llist) * 0.1)
+        if cutoff < 200 and len(llist) >= 200:
+            cutoff = 200
+        logging.info(f'Min sort value {llist[cutoff]}')
+        return llist[cutoff]
+
     def writeLinks(self, min_align_length):
+        if min_align_length == -1:
+            min_align_length = self._calcMinLen()
         with open(os.path.join(self.outDir, "links.txt"), 'w') as output:
             for p, target in enumerate(self.targetList) :
                 if target.name not in self.algnDict.keys() :
+                    logging.debug(f'Skipping link for target: {target.name}')
                     continue
                 for n, aln in enumerate(self.algnDict[target.name]) :
                     if aln.length < min_align_length :
+                        logging.debug(f'ALN Skipping {aln.length} < {min_align_length}') 
                         continue
                     link1 = "link{} {} {} {}".format(str(p)+"_"+str(n), target.tag, aln.T_start, aln.T_end)
                     output.write(link1+"\n")
@@ -184,11 +219,13 @@ class LinkFile:
 
 class KaryotypeFile:
 
-    def __init__(self, targetList, corrKey, refLenDict, outDir):
+    def __init__(self, targetList, queryList, corrKey, refLenDict, qLenDict, outDir):
         """ """
         self.targetList = targetList
+        self.queryList = queryList
         self.corrKey = corrKey
         self.refLenDict = refLenDict
+        self.qLenDict = qLenDict
         self.outDir = outDir
 
         self.targets_to_plot = set()
@@ -200,21 +237,24 @@ class KaryotypeFile:
         return self.targetList
 
     def getIdeogramList(self):
+        logging.debug(self.ideogramList)
         return ';'.join(self.ideogramList)
 
     def filterTargetList(self, maxChr):
-        sorted_chromosomes = [x for x, j in sorted(self.refLenDict.items(), key=lambda item : item[1], reverse=True)]
-        self.targets_to_plot = set(sorted_chromosomes[:maxChr])
+        sorted_rchromosomes = [x for x, j in sorted(self.refLenDict.items(), key=lambda item : item[1], reverse=True)]
+        sorted_qchromosomes = [x for x, j in sorted(self.qLenDict.items(), key=lambda item : item[1], reverse=True)]
+        self.targets_to_plot = set(list(sorted_rchromosomes[:maxChr]) + list( sorted_qchromosomes[:maxChr]))
 
     def generateRuleText(self):
         text = ''
         for t in self.targetList:
             if t.name in self.targets_to_plot:
-                text += f'<rule>\ncondition = to({t.tag})\ncolor={t.color}\nstroke_color={t.color}\n</rule>\n\n'
+                text += f'<rule>\ncondition = from({t.tag})\ncolor={t.color}\nstroke_color={t.color}\n</rule>\n\n'
 
         return text
 
     def readPAF(self, paf, min_align_length):
+        adj_min_len = min_align_length
         with open(paf, 'r') as input:
             for l in input:
                 s = l.rstrip().split()
@@ -229,20 +269,34 @@ class KaryotypeFile:
                 t_end = int(s[8])
                 length = int(s[10])
 
+                if int(s[11]) < 20:
+                    continue
+                if min_align_length == -1:
+                    adj_min_len = int(t_len * 0.05)
                 if length <= min_align_length:
                     continue
-                if target not in self.algnDict.keys() :
-                    self.algnDict[target] = [Alignment(query, q_start, q_end, t_start, t_end, length)]
+                if s[5] not in self.algnDict.keys() :
+                    self.algnDict[s[5]] = [Alignment(query, q_start, q_end, t_start, t_end, length)]
                 else :
-                    self.algnDict[target].append(Alignment(query, q_start, q_end, t_start, t_end, length))
+                    self.algnDict[s[5]].append(Alignment(query, q_start, q_end, t_start, t_end, length))
 
     def writeKaryotype(self, min_align_length):
         skips = 0
+        lines = 0
         with open(os.path.join(self.outDir, "karyotype.txt"), 'w') as output:
+            #TODO: modify this to reflect the queries as well
+            for query in self.queryList:
+                output.write(f'chr - {query.tag} {query.name} 0 {query.length} {query.color}\n')
+                if query.name not in self.targets_to_plot:
+                    logging.debug(f'Skipping {query.name} because it was  not in targets_to_plot')
+                    continue
+                else:
+                    self.ideogramList.append(f'{query.tag}:{query.start}-{query.end}')
             for target in self.targetList:
                 if target not in self.karyotypes:
                     self.karyotypes.append(target)
-                    output.write(f'chr - {target.tag} {target.name} 0 {target.length} {target.color}\n')
+                    displayName = '{:1.20}'.format(target.name)
+                    output.write(f'chr - {target.tag} {displayName} 0 {target.length} {target.color}\n')
                 else:
                     continue
 
@@ -250,6 +304,7 @@ class KaryotypeFile:
                 if target.name not in self.algnDict.keys():
                     continue
                 for aln in self.algnDict[target.name]:
+                    lines += 1
                     if aln.length < min_align_length :
                         skips += 1
                         continue
@@ -278,7 +333,7 @@ class KaryotypeFile:
                         #print(aln.T_start, aln.T_end) # DEBUG
                         continue
                 self.ideogramList.append(f'{target.tag}:{target.start}-{target.end}')
-                print(f'Skipped {skips} lines in alignment of target {target.name}')
+                logging.debug(f'Skipped {skips} out of {lines} lines in alignment of target {target.name}')
 
 
 class Target :
@@ -353,23 +408,18 @@ radius           = 1r
 color            = black
 thickness        = 2p
 
-multiplier       = 1e-6
+multiplier       = 1e-7
 
 format           = %.1f
 
 <tick>
-spacing        = 100000u
+spacing        = 1000000u
 size           = 10p
 show_label     = no
 label_size     = 15p
 label_offset   = 5p
 </tick>
 
-<tick>
-spacing        = 10000u
-size           = 5p
-show_label     = no
-</tick>
 
 </ticks>
 """
