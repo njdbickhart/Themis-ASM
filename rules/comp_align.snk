@@ -150,6 +150,24 @@ rule variant_size_pdfs:
         mv {params.prefix}*.pdf final/{params.wc}/
         """
 
+rule circos_plot:
+    input:
+        paf = "calls/vars{C}.paf",
+        fais = expand("fastas/{asm}.fa.fai", asm=config["assembly"].keys())
+    output:
+        directory("final/{C}/circos_plot")
+    params:
+        minimum = -1,
+        maxchr = 10,
+        debug = '',
+        wc = lambda wildcards : wildcards.C.split('_'),
+    conda:
+        "../envs/circos.yaml"
+    shell:
+        """
+        python {workflow.basedir}/scripts/pafCircosPlotter.py -p {input.paf} -r fastas/{params.wc[0]}.fa -q fastas/{params.wc[1]}.fa -o {output} -c {params.maxchr} -m {params.minimum} {params.debug}
+        """
+
 rule pdfs_finished:
     input:
         varplots = expand("final/{C}/vars{C}.log_all_sizes.pdf", C=pcombis),

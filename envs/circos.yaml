@@ -1,0 +1,8 @@
+name: circos
+channels:
+  - conda-forge
+  - anaconda
+  - bioconda
+  - defaults
+dependencies:
+  - circos
