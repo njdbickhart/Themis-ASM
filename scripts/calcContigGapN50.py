@@ -21,11 +21,13 @@ with open(sys.argv[2], 'r') as fai, open(sys.argv[2] + '.bed', 'w') as out:
 sizes = []
 
 # Run bedtools subtraction and process output
-with sp.Popen(f'bedtools subtract -a {sys.argv[1]} -b {sys.argv[2]}.bed',
-    shell=True, stdout=sp.PIPE, buffsize=1, universal_newlines=True) as bedtools:
-    for l in bedtools:
-        s = l.rstrip().split()
-        sizes.append(int(s[2]) - int(s[1]))
+cmd = ['bedtools', 'subtract', '-b', sys.argv[1], '-a', f'{sys.argv[2]}.bed']
+result = sp.run(cmd, stdout=sp.PIPE ).stdout.decode('utf-8')
+for l in result.split('\n'):
+    s = l.rstrip().split()
+    if len(s) < 3:
+        break
+    sizes.append(int(s[2]) - int(s[1]))
 
 # calculate final values and print output
 sizes.sort(reverse=True)
