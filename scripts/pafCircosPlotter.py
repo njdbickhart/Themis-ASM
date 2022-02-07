@@ -53,7 +53,7 @@ def main(args, parser):
 
     # Create main configuration workhorse and generate correspondance tags
     cConf = CircosConf(args.output)
-    cConf.createCorrespondance(args.reference, args.query, args.minimum, args.bedfile)
+    cConf.createCorrespondance(args.reference, args.query, args.minimum, args.bedfile, args.maxchr)
 
     if args.bedfile != "None":
         cConf.readTargets(args.bedfile)
@@ -63,7 +63,7 @@ def main(args, parser):
         logging.debug('Entering debug mode')
     else:
         logging.basicConfig(level=logging.INFO)
-        
+
 
     # Create output directory
     os.makedirs(args.output, exist_ok=True)
@@ -74,6 +74,8 @@ def main(args, parser):
 
     kFile.readPAF(args.paf, args.minimum)
     kFile.writeKaryotype(args.minimum)
+
+    logging.debug('kFile.algnDict: ' + len(kFile.algnDict.keys()))
 
     # Now create the Link file
     lFile = LinkFile(kFile.algnDict, cConf.targetList, cConf.corrKey, args.output)
@@ -99,6 +101,7 @@ class CircosConf:
         self.corrKey = defaultdict(dict)
         self.refLenDict = {}
         self.qLenDict = {}
+        self.chrOrder = []
 
     def replacePattern(self, input_text, patterns, replacements):
         for p, r in zip(patterns, replacements):
@@ -108,10 +111,11 @@ class CircosConf:
         return input_text
 
     def createConfFile(self, ideogramtext, rulestext):
+        ordertext = ";".join(self.chrOrder)
         with open(os.path.join(self.outDir, "circos.conf"), 'w') as output:
             output.write(self.replacePattern(CIRCOS,
-            ["<CHROMOSOMES_WILL_GO_HERE>", "<RULES_GO_HERE>"],
-            [ideogramtext, rulestext]))
+            ["<CHROMOSOMES_WILL_GO_HERE>", "<ORDERS_GO_HERE>", "<RULES_GO_HERE>"],
+            [ideogramtext, ordertext, rulestext]))
 
     def createTicksFile(self):
         with open(os.path.join(self.outDir, "ticks.conf"), 'w') as output:
@@ -140,8 +144,9 @@ class CircosConf:
                     self.targetList.append(Target(ctg, self.corrKey["QUERY"][ctg], start, end, color, self.qLenDict[s[0]]))
 
 
-    def createCorrespondance(self, ref, query, min_align_length, bedfile):
+    def createCorrespondance(self, ref, query, min_align_length, bedfile, maxchr):
         n = 1
+        tempSort = defaultdict(list)
         for f, t in zip([ref, query], ["REF", "QUERY"]):
             if not os.path.exists(f + '.fai'):
                 logging.info(f'Building fasta index for {t} file: {f}')
@@ -154,6 +159,8 @@ class CircosConf:
                         self.refLenDict[s[0]] = int(s[1])
                     else:
                         self.qLenDict[s[0]] = int(s[1])
+                    if len(tempSort[t]) < maxchr:
+                        tempSort[t].append(self.corrKey[t][s[0]])
                     if bedfile == "None":
                         if t == "REF":
                             color = self.colors[0]
@@ -163,13 +170,15 @@ class CircosConf:
                             color = 'chr10'
                             self.queryList.append(Target(s[0], self.corrKey[t][s[0]], 1, int(s[1]), color, int(s[1])))
                     n += 1
+        tempQuery = tempSort["QUERY"]
+        self.chrOrder = list(tempSort["REF"] + tempQuery[::-1])
 
     def run(self, cmd) :
         cwd = os.getcwd()
         os.chdir(os.path.join(self.outDir))
         logging.info("Running circos in {}".format(os.getcwd()))
-        proc = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT)
-        proc.communicate()
+        proc = sp.run(cmd, stdout=sp.PIPE, stderr=sp.STDOUT, check=True)
+
         logging.info("Done!")
         os.chdir(cwd)
 
@@ -190,6 +199,8 @@ class LinkFile:
             if t.name not in self.algnDict.keys():
                 continue
             llist.extend([x.length for x in self.algnDict[t.name]])
+        if len(llist) == 0:
+            return None
         llist.sort(reverse=True)
         logging.debug(len(llist))
         cutoff = int(len(llist) * 0.1)
@@ -201,6 +212,12 @@ class LinkFile:
     def writeLinks(self, min_align_length):
         if min_align_length == -1:
             min_align_length = self._calcMinLen()
+            if min_align_length == None:
+                # No links will be drawn
+                logging.info('No links met the minimum quality criteria for drawing!')
+                with open(os.path.join(self.outDir, 'links.txt'), 'w') as output:
+                    pass
+                return
         with open(os.path.join(self.outDir, "links.txt"), 'w') as output:
             for p, target in enumerate(self.targetList) :
                 if target.name not in self.algnDict.keys() :
@@ -208,7 +225,7 @@ class LinkFile:
                     continue
                 for n, aln in enumerate(self.algnDict[target.name]) :
                     if aln.length < min_align_length :
-                        logging.debug(f'ALN Skipping {aln.length} < {min_align_length}') 
+                        logging.debug(f'ALN Skipping {aln.length} < {min_align_length}')
                         continue
                     link1 = "link{} {} {} {}".format(str(p)+"_"+str(n), target.tag, aln.T_start, aln.T_end)
                     output.write(link1+"\n")
@@ -269,7 +286,7 @@ class KaryotypeFile:
                 t_end = int(s[8])
                 length = int(s[10])
 
-                if int(s[11]) < 20:
+                if int(s[11]) < 10:
                     continue
                 if min_align_length == -1:
                     adj_min_len = int(t_len * 0.05)
@@ -434,6 +451,7 @@ karyotype = ./karyotype.txt
 chromosomes_units = 1
 chromosomes_display_default = no
 chromosomes = <CHROMOSOMES_WILL_GO_HERE>
+chromosomes_order = <ORDERS_GO_HERE>
 
 <links>
 
