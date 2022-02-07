@@ -212,7 +212,7 @@ class LinkFile:
         if len(llist) >= 200:
             cutoff = 200
         logging.info(f'Min sort value {llist[cutoff]}')
-        return llist[cutoff]
+        return llist[:cutoff]
 
     def writeLinks(self, min_align_length):
         if min_align_length == -1:
