@@ -114,11 +114,13 @@ class CircosConf:
         return input_text
 
     def createConfFile(self, ideogramtext, rulestext):
-        ordertext = ";".join(self.chrOrder)
+        ordertext = ",".join(self.chrOrder)
+        # assuming chromsome count is double the max chr number here
+        reversetext = ",".join(self.chrOrder[int(len(self.chrOrder) / 2):]
         with open(os.path.join(self.outDir, "circos.conf"), 'w') as output:
             output.write(self.replacePattern(CIRCOS,
-            ["<CHROMOSOMES_WILL_GO_HERE>", "<ORDERS_GO_HERE>", "<RULES_GO_HERE>"],
-            [ideogramtext, ordertext, rulestext]))
+            ["<CHROMOSOMES_WILL_GO_HERE>", "<ORDERS_GO_HERE>", "<REVERSES_GO_HERE>", "<RULES_GO_HERE>"],
+            [ideogramtext, ordertext, reversetext, rulestext]))
 
     def createTicksFile(self):
         with open(os.path.join(self.outDir, "ticks.conf"), 'w') as output:
@@ -206,8 +208,8 @@ class LinkFile:
             return None
         llist.sort(reverse=True)
         logging.debug(len(llist))
-        cutoff = int(len(llist) * 0.1)
-        if cutoff < 200 and len(llist) >= 200:
+        cutoff = len(llist)
+        if len(llist) >= 200:
             cutoff = 200
         logging.info(f'Min sort value {llist[cutoff]}')
         return llist[cutoff]
@@ -460,6 +462,7 @@ chromosomes_units = 1
 chromosomes_display_default = no
 chromosomes = <CHROMOSOMES_WILL_GO_HERE>
 chromosomes_order = <ORDERS_GO_HERE>
+chromosomes_reverse = <REVERSES_GO_HERE>
 
 <links>
 
