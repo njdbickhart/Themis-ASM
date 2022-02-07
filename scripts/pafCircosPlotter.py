@@ -70,7 +70,7 @@ def main(args, parser):
 
     # Now create Karyotype file
     kFile = KaryotypeFile(cConf.targetList, cConf.queryList, cConf.corrKey, cConf.refLenDict, cConf.qLenDict, args.output)
-    kFile.filterTargetList(args.maxchr)
+    kFile.filterTargetList(cConf.getChrOrder())
 
     kFile.readPAF(args.paf, args.minimum)
     kFile.writeKaryotype(args.minimum)
@@ -102,6 +102,9 @@ class CircosConf:
         self.refLenDict = {}
         self.qLenDict = {}
         self.chrOrder = []
+
+    def getChrOrder(self):
+        return self.chrOrder
 
     def replacePattern(self, input_text, patterns, replacements):
         for p, r in zip(patterns, replacements):
@@ -246,6 +249,7 @@ class KaryotypeFile:
         self.outDir = outDir
 
         self.targets_to_plot = set()
+        self.names_to_plot = set()
         self.algnDict = {}
         self.karyotypes = []
         self.ideogramList = []
@@ -257,15 +261,18 @@ class KaryotypeFile:
         logging.debug(self.ideogramList)
         return ';'.join(self.ideogramList)
 
-    def filterTargetList(self, maxChr):
-        sorted_rchromosomes = [x for x, j in sorted(self.refLenDict.items(), key=lambda item : item[1], reverse=True)]
-        sorted_qchromosomes = [x for x, j in sorted(self.qLenDict.items(), key=lambda item : item[1], reverse=True)]
-        self.targets_to_plot = set(list(sorted_rchromosomes[:maxChr]) + list( sorted_qchromosomes[:maxChr]))
+    def filterTargetList(self, chrOrder):
+        orderSet = set(chrOrder)
+        for t in self.targetList:
+            if t.tag in orderSet:
+                self.targets_to_plot.add(t.tag)
+                self.names_to_plot.add(t.name)
+
 
     def generateRuleText(self):
         text = ''
         for t in self.targetList:
-            if t.name in self.targets_to_plot:
+            if t.tag in self.targets_to_plot:
                 text += f'<rule>\ncondition = from({t.tag})\ncolor={t.color}\nstroke_color={t.color}\n</rule>\n\n'
 
         return text
@@ -275,7 +282,7 @@ class KaryotypeFile:
         with open(paf, 'r') as input:
             for l in input:
                 s = l.rstrip().split()
-                if s[5] not in self.targets_to_plot:
+                if s[5] not in self.names_to_plot:
                     continue
                 t_len = int(s[6])
                 query = s[0]
@@ -304,7 +311,7 @@ class KaryotypeFile:
             #TODO: modify this to reflect the queries as well
             for query in self.queryList:
                 output.write(f'chr - {query.tag} {query.name} 0 {query.length} {query.color}\n')
-                if query.name not in self.targets_to_plot:
+                if query.tag not in self.targets_to_plot:
                     logging.debug(f'Skipping {query.name} because it was  not in targets_to_plot')
                     continue
                 else:
