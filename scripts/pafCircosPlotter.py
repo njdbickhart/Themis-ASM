@@ -215,9 +215,9 @@ class LinkFile:
         return llist[cutoff]
 
     def writeLinks(self, min_align_length):
-        if min_align_length == -1:
-            logging.info(f'Min align length for links: {min_align_length}')
+        if min_align_length == -1:            
             min_align_length = self._calcMinLen()
+            logging.info(f'Min align length for links: {min_align_length}')
             if min_align_length == None:
                 # No links will be drawn
                 logging.info('No links met the minimum quality criteria for drawing!')
