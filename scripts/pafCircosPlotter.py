@@ -263,10 +263,11 @@ class KaryotypeFile:
 
     def filterTargetList(self, chrOrder):
         orderSet = set(chrOrder)
-        for t in self.targetList:
-            if t.tag in orderSet:
-                self.targets_to_plot.add(t.tag)
-                self.names_to_plot.add(t.name)
+        for l in [self.targetList, self.queryList]:
+            for t in l:
+                if t.tag in orderSet:
+                    self.targets_to_plot.add(t.tag)
+                    self.names_to_plot.add(t.name)
 
 
     def generateRuleText(self):
