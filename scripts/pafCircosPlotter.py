@@ -116,7 +116,7 @@ class CircosConf:
     def createConfFile(self, ideogramtext, rulestext):
         ordertext = ",".join(self.chrOrder)
         # assuming chromsome count is double the max chr number here
-        reversetext = ",".join(self.chrOrder[int(len(self.chrOrder) / 2):]
+        reversetext = ",".join(self.chrOrder[int(len(self.chrOrder) / 2):])
         with open(os.path.join(self.outDir, "circos.conf"), 'w') as output:
             output.write(self.replacePattern(CIRCOS,
             ["<CHROMOSOMES_WILL_GO_HERE>", "<ORDERS_GO_HERE>", "<REVERSES_GO_HERE>", "<RULES_GO_HERE>"],
